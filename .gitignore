@@ -1,0 +1,43 @@
+# Python / Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Datos locales del backend (videos, thumbnails, clips, SQLite DB)
+apps/api/data/
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Frontend / Node
+node_modules/
+apps/web/dist/
+apps/web/dist-ssr/
+*.tsbuildinfo
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
