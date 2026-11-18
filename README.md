@@ -1,4 +1,4 @@
-# ClipSniper (Mandarin Reactor)
+# Mandarin Reactor
 
 Reproductor de video local para estudiar **chino mandarín** mediante inmersión, subtítulos interactivos con `<ruby>` (pinyin + color por tono), diccionario offline **CC-CEDICT**, minado de oraciones con corte automático de clips de video/audio (`ffmpeg`) y generación de mazos para **Anki** (`.apkg` y **AnkiConnect**).
 
@@ -25,14 +25,14 @@ Elegí cualquiera de las opciones según prefieras usar `git` o descargar un arc
 ### Opción A — Clonar con Git (recomendado)
 
 ```bash
-git clone https://github.com/TU_USUARIO/ClipSniper.git
-cd ClipSniper
+git clone https://github.com/MaxAmr/MandarinRector.git
+cd MandarinReactor
 ```
 
 ### Opción B — Descarga directa (sin Git)
 
-- **Descargar ZIP:** [`Descargar ClipSniper (main.zip)`](https://github.com/TU_USUARIO/ClipSniper/archive/refs/heads/main.zip)
-- **Última versión estable:** [`Ver Releases en GitHub`](https://github.com/TU_USUARIO/ClipSniper/releases)
+- **Descargar ZIP:** [`Descargar MandarinReactor (main.zip)`](https://github.com/MaxAmr/MandarinRector/archive/refs/heads/main.zip)
+- **Última versión estable:** [`Ver Releases en GitHub`](https://github.com/MaxAmr/MandarinRector/releases)
 
 *(Si descargás el `.zip`, descomprimilo y abrí una terminal dentro de la carpeta resultante).*
 
@@ -40,7 +40,7 @@ cd ClipSniper
 
 ## Instalación y puesta en marcha
 
-Podés correr **ClipSniper** de dos maneras:
+Podés correr **MandarinReactor** de dos maneras:
 1. **Con Docker Compose** (sin instalar Python, Node ni `ffmpeg` en tu sistema).
 2. **Instalación nativa** en **Linux**, **macOS** o **Windows**.
 
@@ -243,7 +243,7 @@ cp apps/api/.env.example apps/api/.env
 ## Estructura del repositorio
 
 ```text
-ClipSniper/
+MandarinReactor/
 ├── apps/
 │   ├── api/                      # Backend en Python (FastAPI + SQLModel + Alembic)
 │   │   ├── app/

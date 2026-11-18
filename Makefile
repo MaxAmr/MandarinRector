@@ -3,7 +3,7 @@
 PYTHON ?= python3
 
 help:
-	@echo "Comandos disponibles en ClipSniper:"
+	@echo "Comandos disponibles en MandarinReactor:"
 	@echo "  make setup    - Instala dependencias de backend (.venv) y frontend (npm)"
 	@echo "  make cedict   - Descarga e importa el diccionario offline CC-CEDICT en SQLite"
 	@echo "  make dev      - Inicia backend (:8000) y frontend (:5173) juntos"
