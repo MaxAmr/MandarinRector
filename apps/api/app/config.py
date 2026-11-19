@@ -6,7 +6,7 @@ from pydantic import BeforeValidator, Field
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_DATA_DIR = BASE_DIR / "data"
+DEFAULT_DATA_DIR = Path("data")
 
 
 def _parse_cors_origins(value: object) -> list[str]:
@@ -43,7 +43,9 @@ class Settings(BaseSettings):
     MAX_SUBTITLE_BYTES: int = Field(default=5 * 1024 * 1024)  # 5 MiB
     MAX_CUES: int = Field(default=20_000)
     MAX_OFFSET_MS: int = Field(default=600_000)
-    CORS_ORIGINS: CorsOriginsList = Field(default=["http://localhost:5173"])
+    CORS_ORIGINS: CorsOriginsList = Field(
+        default=["http://localhost:5173", "http://127.0.0.1:5173"]
+    )
 
     # Fase 3: Segmentación jieba y pypinyin
     USERDICT_PATH: Path | None = Field(default=None)

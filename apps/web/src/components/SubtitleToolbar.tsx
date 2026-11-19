@@ -10,7 +10,7 @@ import {
   SkipForward,
   SlidersHorizontal,
 } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { S } from "../lib/strings";
 import type {
   SubtitleLang,
@@ -122,7 +122,16 @@ export const SubtitleToolbar: React.FC<SubtitleToolbarProps> = ({
   const togglePauseAfterCue = useStudyStore((s) => s.togglePauseAfterCue);
   const loopCueIdx = useStudyStore((s) => s.loopCueIdx);
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Un solo menú desplegable abierto a la vez (Pinyin o Subtítulos).
+  const [openMenu, setOpenMenu] = useState<"pinyin" | "subtitles" | null>(null);
+  const handlePinyinOpenChange = useCallback((open: boolean) => {
+    setOpenMenu((current) => (open ? "pinyin" : current === "pinyin" ? null : current));
+  }, []);
+  const handleSubtitlesOpenChange = useCallback((open: boolean) => {
+    setOpenMenu((current) =>
+      open ? "subtitles" : current === "subtitles" ? null : current,
+    );
+  }, []);
   const [manageOpen, setManageOpen] = useState(false);
   const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
   const [editLabel, setEditLabel] = useState("");
@@ -188,10 +197,16 @@ export const SubtitleToolbar: React.FC<SubtitleToolbarProps> = ({
         </ToggleBtn>
 
         <div className="ml-auto flex items-center gap-1.5">
-          <PinyinSettingsPopover />
-          <SubtitleSettings open={settingsOpen} onOpenChange={setSettingsOpen}>
-            <div className="grid gap-3">
-              <div className="grid gap-1.5">
+          <PinyinSettingsPopover
+            open={openMenu === "pinyin"}
+            onOpenChange={handlePinyinOpenChange}
+          />
+          <SubtitleSettings
+            open={openMenu === "subtitles"}
+            onOpenChange={handleSubtitlesOpenChange}
+          >
+            <div className="grid min-w-0 grid-cols-1 gap-3">
+              <div className="grid min-w-0 grid-cols-1 gap-1.5">
                 <label htmlFor="primary-track-select" className="text-xs text-ink2">
                   Pista principal
                 </label>
@@ -221,7 +236,7 @@ export const SubtitleToolbar: React.FC<SubtitleToolbarProps> = ({
                 </div>
               </div>
 
-              <div className="grid gap-1.5">
+              <div className="grid min-w-0 grid-cols-1 gap-1.5">
                 <label htmlFor="secondary-track-select" className="text-xs text-ink2">
                   Pista secundaria
                 </label>
@@ -340,7 +355,7 @@ export const SubtitleToolbar: React.FC<SubtitleToolbarProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setSettingsOpen(false);
+                    setOpenMenu(null);
                     onOpenUploadDialog();
                   }}
                   className={GHOST_BTN}
@@ -676,7 +691,7 @@ const SubtitleSettings: React.FC<{
         <div
           role="dialog"
           aria-label="Ajustes de subtítulos"
-          className="absolute bottom-full right-0 z-30 mb-2 w-80 max-w-[90vw] rounded-lg border border-line bg-surface2 p-3 shadow-xl"
+          className="absolute bottom-full right-0 z-40 mb-2 max-h-[min(70vh,34rem)] w-96 max-w-[calc(100vw-2rem)] overflow-y-auto overflow-x-hidden rounded-lg border border-line bg-surface2 p-3 shadow-xl"
         >
           {children}
         </div>

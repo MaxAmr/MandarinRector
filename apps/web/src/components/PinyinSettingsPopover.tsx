@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { CueTokens } from "../lib/tokens";
 import { useStudyStore } from "../store/studyStore";
 import { CueText } from "./CueText";
@@ -13,8 +13,46 @@ const PREVIEW_TOKENS: CueTokens = {
   ],
 };
 
-export const PinyinSettingsPopover: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
+export interface PinyinSettingsPopoverProps {
+  /** Estado controlado desde el padre (para permitir un solo menú abierto a la vez). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export const PinyinSettingsPopover: React.FC<PinyinSettingsPopoverProps> = ({
+  open,
+  onOpenChange,
+}) => {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = open !== undefined;
+  const isOpen = isControlled ? open : uncontrolledOpen;
+  const setIsOpen = useCallback(
+    (next: boolean) => {
+      if (!isControlled) setUncontrolledOpen(next);
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange],
+  );
+
+  // Cerrar al hacer clic fuera del popover o al presionar Escape.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [isOpen, setIsOpen]);
 
   const showPinyinOverlay = useStudyStore((s) => s.showPinyinOverlay);
   const togglePinyinOverlay = useStudyStore((s) => s.togglePinyinOverlay);
@@ -34,26 +72,30 @@ export const PinyinSettingsPopover: React.FC = () => {
   const togglePauseOnLookup = useStudyStore((s) => s.togglePauseOnLookup);
 
   return (
-    <div className="relative">
+    <div ref={rootRef} className="relative">
       <button
         type="button"
-        onClick={() => setIsOpen((v) => !v)}
+        onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
+        aria-haspopup="dialog"
         aria-label="Ajustes de Pinyin y Tonos"
-        className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-accent ${
+        className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
           isOpen
-            ? "border-accent bg-accent/20 text-accent"
-            : "border-lineStrong bg-surface2 text-ink hover:bg-line"
+            ? "border-accent bg-accent/10 text-accent"
+            : "border-line text-ink2 hover:bg-surface2 hover:text-ink"
         }`}
       >
-        拼 Pinyin
+        <span lang="zh-Hans" aria-hidden="true">
+          拼
+        </span>
+        Pinyin
       </button>
 
       {isOpen && (
         <div
           role="dialog"
           aria-label="Configuración de Pinyin y Tonos"
-          className="absolute bottom-full right-0 z-40 mb-2 w-72 rounded-lg border border-lineStrong bg-surface p-4 shadow-2xl"
+          className="absolute bottom-full right-0 z-40 mb-2 max-h-[min(70vh,34rem)] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overflow-x-hidden rounded-lg border border-line bg-surface2 p-4 shadow-xl"
         >
           <div className="flex items-center justify-between border-b border-line pb-2">
             <h3 className="text-xs font-semibold text-ink">Pinyin y Colores de Tono</h3>

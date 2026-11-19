@@ -156,12 +156,18 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
     return (
       <div
         ref={wrapperRef}
-        className={`group relative flex flex-col overflow-hidden rounded-lg border border-line bg-black ${isFullscreen ? "h-full" : ""}`}
+        className={`group relative flex min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-black ${
+          isFullscreen ? "h-full" : "shrink-0 lg:flex-1 lg:shrink"
+        }`}
       >
-        {/* Área de video + Overlay */}
+        {/* Área de video + Overlay.
+            - Móvil: relación 16:9 según el ancho.
+            - Desktop (lg+): ocupa todo el alto disponible y el video se ajusta con
+              object-contain, así nunca se recorta (con o sin panel lateral) y la
+              barra de controles siempre queda visible debajo. */}
         <div
           className={`relative flex w-full items-center justify-center bg-black [container-type:inline-size] ${
-            isFullscreen ? "min-h-0 flex-1" : "aspect-video max-h-[calc(100vh-14rem)]"
+            isFullscreen ? "min-h-0 flex-1" : "aspect-video lg:aspect-auto lg:min-h-0 lg:flex-1"
           }`}
         >
           <video
@@ -171,7 +177,7 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
             preload="metadata"
             playsInline
             onClick={onTogglePlay}
-            className="h-full w-full cursor-pointer object-contain"
+            className="absolute inset-0 h-full w-full cursor-pointer object-contain"
           />
 
           {/* Badges superiores de estado de estudio (Loop / PauseAfterCue) */}

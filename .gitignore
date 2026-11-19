@@ -17,8 +17,10 @@ dist/
 build/
 *.egg-info/
 
-# Datos locales del backend (videos, thumbnails, clips, SQLite DB)
+# Datos locales del backend (videos, thumbnails, clips, SQLite DB) y PIDs/logs del lanzador
 apps/api/data/
+.run/
+ClipSniper.desktop
 
 # Variables de entorno
 .env

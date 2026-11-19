@@ -36,9 +36,14 @@ def build_engine(settings: Settings | None = None) -> Engine:
 
 
 def build_alembic_config(database_url: str | None = None) -> AlembicConfig:
-    alembic_ini_path = Path(BASE_DIR) / "alembic.ini"
+    alembic_ini_path = Path("alembic.ini")
+    if not alembic_ini_path.exists():
+        alembic_ini_path = Path(BASE_DIR) / "alembic.ini"
     cfg = AlembicConfig(str(alembic_ini_path))
-    cfg.set_main_option("script_location", str(Path(BASE_DIR) / "alembic"))
+    script_loc = Path("alembic")
+    if not script_loc.exists():
+        script_loc = Path(BASE_DIR) / "alembic"
+    cfg.set_main_option("script_location", str(script_loc))
     cfg.attributes["skip_logging_config"] = True
     if database_url:
         cfg.set_main_option("sqlalchemy.url", database_url)

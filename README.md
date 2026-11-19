@@ -38,6 +38,21 @@ cd MandarinReactor
 
 ---
 
+## Lanzador rápido de 1 clic (con pantalla de carga)
+
+Una vez instalados los requisitos del sistema (`Python 3.11+`, `Node.js 20+` y `ffmpeg`), no hace falta abrir dos terminales ni escribir comandos cada vez que quieras estudiar:
+
+- **🐧 Linux / 🍎 macOS:** Ejecutá `./start.sh` (o creá un icono de 1 clic en tu Escritorio y menú de aplicaciones con `make desktop`).
+- **🪟 Windows:** Hacé doble clic en `start.bat`.
+
+El lanzador:
+1. Instala automáticamente el `.venv` y `node_modules` si es la primera vez que lo abrís.
+2. Muestra una mini pantalla de carga CLI con spinners en tiempo real mientras levanta el Backend (`:8000`) y el Frontend (`:5173`) en segundo plano.
+3. Abre automáticamente tu navegador en `http://localhost:5173` apenas ambos servicios están listos y **cierra la ventana de carga sola**.
+4. Para detener los servicios en segundo plano cuando termines: `./start.sh --stop` (o clic derecho → *Detener servicios* sobre el icono del Escritorio en Linux).
+
+---
+
 ## Instalación y puesta en marcha
 
 Podés correr **MandarinReactor** de dos maneras:
