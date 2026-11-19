@@ -158,7 +158,7 @@ else
     cd "$API_DIR"
     export PATH="$PWD/.venv/bin:$PATH"
     export PYTHONPATH="$PWD"
-    setsid ./.venv/bin/python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000 </dev/null >"$ROOT_DIR/$API_LOG" 2>&1 &
+    setsid ./.venv/bin/python -m uvicorn app.main:create_app --factory --reload --host 0.0.0.0 --port 8000 </dev/null >"$ROOT_DIR/$API_LOG" 2>&1 &
     echo $! >"$ROOT_DIR/$API_PID_FILE"
   )
   if ! spin_wait "Iniciando Backend FastAPI + SQLite + Jieba..." "$API_URL" 45; then

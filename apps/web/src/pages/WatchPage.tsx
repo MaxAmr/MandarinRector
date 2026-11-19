@@ -653,7 +653,7 @@ export const WatchPage: React.FC = () => {
   }
 
   return (
-    <div className="mx-auto flex h-screen max-w-[1800px] flex-col gap-3 overflow-hidden px-4 py-3 sm:px-6">
+    <div className="mx-auto flex min-h-screen max-w-[1800px] flex-col gap-3 px-4 py-3 sm:px-6">
       {/* Cabecera */}
       <header className="flex shrink-0 items-center gap-3">
         <Link
@@ -684,9 +684,9 @@ export const WatchPage: React.FC = () => {
       </header>
 
       {/* Layout principal: Reproductor + Toolbar a la izquierda, Panel de subtítulos a la derecha */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-4 lg:grid-cols-12 lg:grid-rows-1">
+      <div className="grid grid-cols-1 gap-4 lg:h-[calc(100vh-5.5rem)] lg:min-h-[480px] lg:grid-cols-12 lg:grid-rows-1">
         <div
-          className={`flex min-h-0 flex-col gap-3 overflow-y-auto ${
+          className={`flex min-h-0 flex-col gap-3 ${
             showPanel ? "lg:col-span-8" : "lg:col-span-12"
           }`}
         >

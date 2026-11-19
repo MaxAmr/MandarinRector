@@ -127,6 +127,7 @@ async def export_via_ankiconnect(
     session: Annotated[Session, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> AnkiConnectExportResponse:
+    card_types = _validate_card_types(payload.card_types)
     phrases, videos_by_id = _select_phrases_and_videos(
         session, payload.video_id, payload.phrase_ids
     )
@@ -137,6 +138,8 @@ async def export_via_ankiconnect(
             settings=settings,
             deck_name=payload.deck_name,
             anki_connect_url=payload.anki_connect_url,
+            include_video=payload.include_video,
+            card_types=card_types,
         )
     except Exception as exc:
         raise HTTPException(

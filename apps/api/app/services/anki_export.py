@@ -270,17 +270,113 @@ def build_anki_apkg_bytes(
         tmp_path.unlink(missing_ok=True)
 
 
+ANKI_CONNECT_MODEL_NAME = "Mandarin Reactor Clip"
+ANKI_MODEL_FIELDS = [
+    "Hanzi",
+    "FocusWord",
+    "Pinyin",
+    "Traduccion",
+    "Notas",
+    "Screenshot",
+    "Audio",
+    "VideoClip",
+    "FuenteVideo",
+]
+
+
+async def _ensure_ankiconnect_model(
+    client: httpx.AsyncClient,
+    anki_connect_url: str,
+    card_types: list[CardType],
+) -> str:
+    """Garantiza que el tipo de nota 'Mandarin Reactor Clip' exista en Anki (sin depender del idioma de la interfaz de Anki)."""
+    templates = _build_templates(card_types)
+    ankiconnect_templates = [
+        {
+            "Name": tpl["name"],
+            "Front": tpl["qfmt"],
+            "Back": tpl["afmt"],
+        }
+        for tpl in templates
+    ]
+
+    names_resp = await client.post(
+        anki_connect_url,
+        json={"action": "modelNames", "version": 6},
+    )
+    names_body = names_resp.json()
+    existing_models: set[str] = set(names_body.get("result") or [])
+
+    if ANKI_CONNECT_MODEL_NAME not in existing_models:
+        create_resp = await client.post(
+            anki_connect_url,
+            json={
+                "action": "createModel",
+                "version": 6,
+                "params": {
+                    "modelName": ANKI_CONNECT_MODEL_NAME,
+                    "inOrderFields": ANKI_MODEL_FIELDS,
+                    "css": ANKI_CARD_CSS,
+                    "isCloze": False,
+                    "cardTemplates": ankiconnect_templates,
+                },
+            },
+        )
+        create_body = create_resp.json()
+        if create_body.get("error"):
+            raise RuntimeError(
+                f"Error al crear tipo de nota '{ANKI_CONNECT_MODEL_NAME}' en Anki: {create_body['error']}"
+            )
+    else:
+        # Actualizar plantillas y CSS por si el usuario cambió los checkboxes de tipos de tarjeta
+        await client.post(
+            anki_connect_url,
+            json={
+                "action": "updateModelStyling",
+                "version": 6,
+                "params": {
+                    "model": {
+                        "name": ANKI_CONNECT_MODEL_NAME,
+                        "css": ANKI_CARD_CSS,
+                    }
+                },
+            },
+        )
+        templates_dict = {
+            tpl["name"]: {"Front": tpl["qfmt"], "Back": tpl["afmt"]}
+            for tpl in templates
+        }
+        await client.post(
+            anki_connect_url,
+            json={
+                "action": "updateModelTemplates",
+                "version": 6,
+                "params": {
+                    "model": {
+                        "name": ANKI_CONNECT_MODEL_NAME,
+                        "templates": templates_dict,
+                    }
+                },
+            },
+        )
+
+    return ANKI_CONNECT_MODEL_NAME
+
+
 async def push_phrases_to_ankiconnect(
     phrases: list[Phrase],
     videos_by_id: dict[int, Video],
     settings: Settings,
     deck_name: str = "Mandarín - Clips",
     anki_connect_url: str = "http://127.0.0.1:8765",
+    include_video: bool = False,
+    card_types: list[CardType] | None = None,
 ) -> dict[str, int]:
     """Envía frases y archivos multimedia directamente a Anki abierto mediante AnkiConnect."""
     clean_deck = deck_name.strip() or "Mandarín - Clips"
+    selected_types = card_types or ["listening", "reading"]
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(timeout=20.0) as client:
         # 1. Crear el mazo si no existe
         deck_resp = await client.post(
             anki_connect_url,
@@ -290,11 +386,17 @@ async def push_phrases_to_ankiconnect(
         if deck_body.get("error"):
             raise RuntimeError(f"AnkiConnect error: {deck_body['error']}")
 
+        # 2. Asegurar nuestro propio tipo de nota 'Mandarin Reactor Clip' (funciona en Anki en español, inglés, etc.)
+        model_name = await _ensure_ankiconnect_model(
+            client, anki_connect_url, selected_types
+        )
+
         added_count = 0
         skipped_count = 0
+        last_error: str | None = None
 
         for phrase in phrases:
-            # Subir audio y miniatura a la carpeta media de Anki via storeMediaFile
+            # Subir audio, miniatura y video opcional a la carpeta media de Anki via storeMediaFile
             audio_tag = ""
             if phrase.clip_audio_path:
                 abs_aud = resolve_data_path(settings, phrase.clip_audio_path)
@@ -325,23 +427,24 @@ async def push_phrases_to_ankiconnect(
                     )
                     thumb_tag = f'<img src="{abs_img.name}">'
 
+            video_tag = ""
+            if include_video and phrase.clip_video_path:
+                abs_vid = resolve_data_path(settings, phrase.clip_video_path)
+                if abs_vid.is_file():
+                    b64_vid = base64.b64encode(abs_vid.read_bytes()).decode("ascii")
+                    await client.post(
+                        anki_connect_url,
+                        json={
+                            "action": "storeMediaFile",
+                            "version": 6,
+                            "params": {"filename": abs_vid.name, "data": b64_vid},
+                        },
+                    )
+                    video_tag = f"[sound:{abs_vid.name}]"
+
             video_obj = videos_by_id.get(phrase.video_id)
             video_title = video_obj.title if video_obj else f"Video #{phrase.video_id}"
-
-            front_html = (
-                f"{thumb_tag}<br>{audio_tag}"
-                f"<div style='font-size:28px;font-weight:bold;margin-top:8px'>{html.escape(phrase.hanzi)}</div>"
-            )
-            back_html = (
-                f"<div style='color:#38bdf8;font-family:monospace;font-size:18px'>{html.escape(phrase.pinyin)}</div>"
-                f"<div style='font-size:18px;margin-top:6px'>{html.escape(phrase.translation)}</div>"
-                + (
-                    f"<div style='font-size:14px;color:#94a3b8;margin-top:6px'>{html.escape(phrase.notes)}</div>"
-                    if phrase.notes
-                    else ""
-                )
-                + f"<div style='font-size:12px;color:#64748b;margin-top:10px'>{html.escape(video_title)} ({_format_ms_mmss(phrase.start_ms)})</div>"
-            )
+            source_label = f"{video_title} ({_format_ms_mmss(phrase.start_ms)})"
 
             note_resp = await client.post(
                 anki_connect_url,
@@ -351,21 +454,41 @@ async def push_phrases_to_ankiconnect(
                     "params": {
                         "note": {
                             "deckName": clean_deck,
-                            "modelName": "Basic",
+                            "modelName": model_name,
                             "fields": {
-                                "Front": front_html,
-                                "Back": back_html,
+                                "Hanzi": html.escape(phrase.hanzi),
+                                "FocusWord": html.escape(phrase.focus_word or ""),
+                                "Pinyin": html.escape(phrase.pinyin),
+                                "Traduccion": html.escape(phrase.translation),
+                                "Notas": html.escape(phrase.notes or ""),
+                                "Screenshot": thumb_tag,
+                                "Audio": audio_tag,
+                                "VideoClip": video_tag,
+                                "FuenteVideo": html.escape(source_label),
                             },
-                            "options": {"allowDuplicate": False},
+                            "options": {
+                                "allowDuplicate": False,
+                                "duplicateScope": "deck",
+                            },
                             "tags": ["mandarin-reactor"],
                         }
                     },
                 },
             )
             note_body = note_resp.json()
-            if note_body.get("error"):
-                skipped_count += 1
+            err = note_body.get("error")
+            if err:
+                err_str = str(err)
+                # Solo contabilizar como 'skipped' si realmente ya existe como duplicada en el mazo
+                if "duplicate" in err_str.lower():
+                    skipped_count += 1
+                else:
+                    last_error = err_str
+                    skipped_count += 1
             else:
                 added_count += 1
+
+        if added_count == 0 and last_error is not None:
+            raise RuntimeError(f"Error de AnkiConnect al agregar nota: {last_error}")
 
         return {"added": added_count, "skipped": skipped_count}

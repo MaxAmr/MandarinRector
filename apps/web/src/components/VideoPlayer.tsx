@@ -257,7 +257,7 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
               <RotateCw size={16} />
             </IconBtn>
 
-            <div className="group/vol ml-1 flex items-center">
+            <div className="ml-1 flex items-center gap-1">
               <IconBtn
                 onClick={onToggleMute}
                 label={muted ? "Activar sonido (M)" : "Silenciar (M)"}
@@ -272,11 +272,11 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
                 step={0.05}
                 value={muted ? 0 : volume}
                 onChange={(e) => onSetVolume(Number.parseFloat(e.target.value))}
-                className="h-1 w-0 cursor-pointer appearance-none rounded bg-lineStrong accent-accent opacity-0 transition-all focus:w-20 focus:opacity-100 focus:outline-none group-hover/vol:w-20 group-hover/vol:opacity-100"
+                className="h-1.5 w-20 cursor-pointer appearance-none rounded bg-lineStrong accent-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               />
             </div>
 
-            <span className="ml-2 font-mono text-xs tabular-nums text-ink2">
+            <span className="ml-2 font-mono text-xs tabular-nums text-ink">
               {formatDuration(clampedCurrent)} / {formatDuration(safeDuration)}
             </span>
 
@@ -310,7 +310,7 @@ const IconBtn: React.FC<{
     onClick={onClick}
     aria-label={label}
     title={label}
-    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink2 transition hover:bg-surface2 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink transition hover:bg-surface2 hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
   >
     {children}
   </button>

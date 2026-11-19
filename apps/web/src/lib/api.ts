@@ -537,12 +537,335 @@ export async function downloadAnkiApkg(payload: AnkiExportPayload): Promise<void
   window.URL.revokeObjectURL(url);
 }
 
+const ANKICONNECT_MODEL_NAME = "Mandarin Reactor Clip";
+const ANKICONNECT_MODEL_FIELDS = [
+  "Hanzi",
+  "FocusWord",
+  "Pinyin",
+  "Traduccion",
+  "Notas",
+  "Screenshot",
+  "Audio",
+  "VideoClip",
+  "FuenteVideo",
+];
+
+const ANKICONNECT_CARD_CSS = `
+.card {
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+  font-size: 20px;
+  text-align: center;
+  color: #f8fafc;
+  background-color: #0f172a;
+  padding: 20px;
+}
+.hanzi {
+  font-size: 34px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 12px 0 6px;
+  line-height: 1.35;
+}
+.pinyin {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 20px;
+  color: #38bdf8;
+  margin-bottom: 10px;
+}
+.translation {
+  font-size: 19px;
+  color: #e2e8f0;
+  margin-bottom: 12px;
+}
+.focus-hint {
+  display: inline-block;
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 6px;
+  padding: 2px 10px;
+  font-size: 15px;
+  margin: 6px 0;
+}
+.notes {
+  font-size: 15px;
+  font-style: italic;
+  color: #94a3b8;
+  margin-top: 10px;
+}
+.source {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 16px;
+}
+.media img {
+  max-width: 420px;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  margin: 8px auto;
+  display: block;
+}
+`;
+
+function buildAnkiCardTemplates(cardTypes: AnkiCardType[]) {
+  const normalized = cardTypes.length > 0 ? cardTypes : ["listening", "reading"];
+  const templates: Array<{ Name: string; Front: string; Back: string }> = [];
+
+  if (normalized.includes("listening")) {
+    templates.push({
+      Name: "1. Escucha → Lectura",
+      Front:
+        '<div class="media">{{Screenshot}}<br>{{Audio}}{{VideoClip}}</div>' +
+        '{{#FocusWord}}<div class="focus-hint">Foco: {{FocusWord}}</div>{{/FocusWord}}',
+      Back:
+        '{{FrontSide}}<hr id="answer">' +
+        '<div class="hanzi">{{Hanzi}}</div>' +
+        '<div class="pinyin">{{Pinyin}}</div>' +
+        '<div class="translation">{{Traduccion}}</div>' +
+        '{{#Notas}}<div class="notes">{{Notas}}</div>{{/Notas}}' +
+        '<div class="source">{{FuenteVideo}}</div>',
+    });
+  }
+
+  if (normalized.includes("reading")) {
+    templates.push({
+      Name: "2. Lectura → Significado",
+      Front:
+        '<div class="hanzi">{{Hanzi}}</div>' +
+        '{{#FocusWord}}<div class="focus-hint">Foco: {{FocusWord}}</div>{{/FocusWord}}',
+      Back:
+        '{{FrontSide}}<hr id="answer">' +
+        '<div class="pinyin">{{Pinyin}}</div>' +
+        '<div class="translation">{{Traduccion}}</div>' +
+        '<div class="media">{{Screenshot}}<br>{{Audio}}{{VideoClip}}</div>' +
+        '{{#Notas}}<div class="notes">{{Notas}}</div>{{/Notas}}' +
+        '<div class="source">{{FuenteVideo}}</div>',
+    });
+  }
+
+  if (normalized.includes("production")) {
+    templates.push({
+      Name: "3. Producción (Traducción → Hanzi)",
+      Front:
+        '<div class="translation">{{Traduccion}}</div>' +
+        '{{#FocusWord}}<div class="focus-hint">Palabra clave: {{FocusWord}}</div>{{/FocusWord}}' +
+        '<div class="media">{{Screenshot}}</div>',
+      Back:
+        '{{FrontSide}}<hr id="answer">' +
+        '<div class="hanzi">{{Hanzi}}</div>' +
+        '<div class="pinyin">{{Pinyin}}</div>' +
+        '<div>{{Audio}}{{VideoClip}}</div>' +
+        '{{#Notas}}<div class="notes">{{Notas}}</div>{{/Notas}}' +
+        '<div class="source">{{FuenteVideo}}</div>',
+    });
+  }
+
+  return templates;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatMsMmSs(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
+  const ss = String(totalSec % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+async function fetchBlobAsBase64(url: string): Promise<string | null> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const buf = await resp.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+  } catch {
+    return null;
+  }
+}
+
+async function invokeAnkiConnect<T = unknown>(
+  url: string,
+  action: string,
+  params?: Record<string, unknown>,
+): Promise<T> {
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      params ? { action, version: 6, params } : { action, version: 6 },
+    ),
+  });
+  const body = (await resp.json()) as { result: T; error: string | null };
+  if (body.error) {
+    throw new Error(body.error);
+  }
+  return body.result;
+}
+
 export async function exportToAnkiConnect(
   payload: AnkiExportPayload,
 ): Promise<AnkiConnectExportResponse> {
-  return requestJson<AnkiConnectExportResponse>("/api/export/ankiconnect", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const ankiUrl = payload.anki_connect_url ?? "http://127.0.0.1:8765";
+  const deckName = (payload.deck_name ?? "Mandarín - Clips").trim() || "Mandarín - Clips";
+  const cardTypes = payload.card_types ?? ["listening", "reading"];
+  const includeVideo = Boolean(payload.include_video);
+
+  // 1. Obtener frases y videos desde nuestra API
+  const [allPhrases, allVideos] = await Promise.all([
+    fetchPhrases({ videoId: payload.video_id ?? null }),
+    fetchVideos(),
+  ]);
+  const selectedSet =
+    payload.phrase_ids && payload.phrase_ids.length > 0
+      ? new Set(payload.phrase_ids)
+      : null;
+  const phrases = selectedSet
+    ? allPhrases.filter((p) => selectedSet.has(p.id))
+    : allPhrases;
+
+  if (phrases.length === 0) {
+    throw new Error("No hay frases seleccionadas para exportar.");
+  }
+
+  const videosById = new Map(allVideos.map((v) => [v.id, v.title]));
+
+  // 2. Intentar hablar directamente con AnkiConnect (http://127.0.0.1:8765);
+  //    si el navegador bloquea por CORS en AnkiConnect, caer al endpoint del backend.
+  try {
+    await invokeAnkiConnect(ankiUrl, "createDeck", { deck: deckName });
+
+    const existingModels = await invokeAnkiConnect<string[]>(ankiUrl, "modelNames");
+    const templates = buildAnkiCardTemplates(cardTypes);
+
+    if (!existingModels.includes(ANKICONNECT_MODEL_NAME)) {
+      await invokeAnkiConnect(ankiUrl, "createModel", {
+        modelName: ANKICONNECT_MODEL_NAME,
+        inOrderFields: ANKICONNECT_MODEL_FIELDS,
+        css: ANKICONNECT_CARD_CSS,
+        isCloze: false,
+        cardTemplates: templates,
+      });
+    } else {
+      await invokeAnkiConnect(ankiUrl, "updateModelStyling", {
+        model: { name: ANKICONNECT_MODEL_NAME, css: ANKICONNECT_CARD_CSS },
+      }).catch(() => undefined);
+    }
+
+    let added = 0;
+    let skipped = 0;
+    let lastError: string | null = null;
+
+    for (const phrase of phrases) {
+      let audioTag = "";
+      if (phrase.clip_audio_url) {
+        const b64 = await fetchBlobAsBase64(phrase.clip_audio_url);
+        if (b64) {
+          const filename = `mr_clip_${phrase.id}.mp3`;
+          await invokeAnkiConnect(ankiUrl, "storeMediaFile", {
+            filename,
+            data: b64,
+          });
+          audioTag = `[sound:${filename}]`;
+        }
+      }
+
+      let thumbTag = "";
+      if (phrase.clip_thumb_url) {
+        const b64 = await fetchBlobAsBase64(phrase.clip_thumb_url);
+        if (b64) {
+          const filename = `mr_clip_${phrase.id}.jpg`;
+          await invokeAnkiConnect(ankiUrl, "storeMediaFile", {
+            filename,
+            data: b64,
+          });
+          thumbTag = `<img src="${filename}">`;
+        }
+      }
+
+      let videoTag = "";
+      if (includeVideo && phrase.clip_video_url) {
+        const b64 = await fetchBlobAsBase64(phrase.clip_video_url);
+        if (b64) {
+          const filename = `mr_clip_${phrase.id}.mp4`;
+          await invokeAnkiConnect(ankiUrl, "storeMediaFile", {
+            filename,
+            data: b64,
+          });
+          videoTag = `[sound:${filename}]`;
+        }
+      }
+
+      const videoTitle =
+        videosById.get(phrase.video_id) ?? `Video #${phrase.video_id}`;
+      const sourceLabel = `${videoTitle} (${formatMsMmSs(phrase.start_ms)})`;
+
+      try {
+        await invokeAnkiConnect(ankiUrl, "addNote", {
+          note: {
+            deckName,
+            modelName: ANKICONNECT_MODEL_NAME,
+            fields: {
+              Hanzi: escapeHtml(phrase.hanzi),
+              FocusWord: escapeHtml(phrase.focus_word ?? ""),
+              Pinyin: escapeHtml(phrase.pinyin),
+              Traduccion: escapeHtml(phrase.translation),
+              Notas: escapeHtml(phrase.notes ?? ""),
+              Screenshot: thumbTag,
+              Audio: audioTag,
+              VideoClip: videoTag,
+              FuenteVideo: escapeHtml(sourceLabel),
+            },
+            options: {
+              allowDuplicate: false,
+              duplicateScope: "deck",
+            },
+            tags: ["mandarin-reactor"],
+          },
+        });
+        added += 1;
+      } catch (noteErr) {
+        const msg = noteErr instanceof Error ? noteErr.message : String(noteErr);
+        if (msg.toLowerCase().includes("duplicate")) {
+          skipped += 1;
+        } else {
+          lastError = msg;
+          skipped += 1;
+        }
+      }
+    }
+
+    if (added === 0 && lastError) {
+      throw new Error(`AnkiConnect rechazó las notas: ${lastError}`);
+    }
+
+    return { deck_name: deckName, added, skipped };
+  } catch (directErr) {
+    // Si fue un error explícito de AnkiConnect (no de red/CORS), propagarlo
+    if (
+      directErr instanceof Error &&
+      !directErr.message.toLowerCase().includes("failed to fetch") &&
+      !directErr.message.toLowerCase().includes("networkerror")
+    ) {
+      throw directErr;
+    }
+    return requestJson<AnkiConnectExportResponse>("/api/export/ankiconnect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  }
 }
